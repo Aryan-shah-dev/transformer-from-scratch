@@ -5,7 +5,8 @@ __pycache__/
 
 # C extensions
 *.so
-
+# tiny shakesphere dataset
+data/input.txt
 # Distribution / packaging
 .Python
 build/
