@@ -1,12 +1,12 @@
 import torch
-from data.tokenizer import CharTokenizer
+import config
 class TextDataset:
-    def __init__(self,tok,block_size,batch_size,ratio =0.85):
+    def __init__(self,tok):
         self.dataset = torch.tensor(tok.encode(tok.text),dtype = torch.long) 
-        self.train = self.dataset[:int(len(self.dataset)*ratio)]
-        self.val = self.dataset[int(len(self.dataset)*ratio):]
-        self.block_size = block_size
-        self.batch_size = batch_size
+        self.train = self.dataset[:int(len(self.dataset)*config.split_ratio)]
+        self.val = self.dataset[int(len(self.dataset)*config.split_ratio):]
+        self.block_size = config.block_size
+        self.batch_size = config.batch_size
     def get_batch(self,split):
         if(split == "train"):
             data = self.train 
