@@ -3,3 +3,4 @@
 block_size = 128 #sees last 128 tokens when generating 
 batch_size = 16 #how many sequences train parallely 
 split_ratio = 0.85 #split between train:validation 
+d_model = 64 #size of embedding per token
