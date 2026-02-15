@@ -14,6 +14,8 @@ class TransformerModel(nn.Module):
                             ,nn.GELU()
                             ,nn.Linear(config.d_model*4,config.d_model))
         self.Ln2 = nn.LayerNorm(config.d_model)
+        self.Ln3 = nn.LayerNorm(config.d_model) 
+        self.Lm_head = nn.Linear(config.d_model , vocab_size) 
     def forward(self , idx):
         B,T = idx.shape #B = batch size , T = block size 
         #get embedding for each token in each batch 
@@ -24,7 +26,8 @@ class TransformerModel(nn.Module):
         #attention noww 
         x = x + self.attention(self.Ln1(x))
         x = x + self.ff(self.Ln2(x)) 
-        return x 
+        logits = self.Lm_head(self.Ln3(x)) 
+        return logits 
     def attention(self,x):
         B,T,C = x.shape
         #attention noww 
