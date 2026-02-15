@@ -9,6 +9,11 @@ class TransformerModel(nn.Module):
         self.Wq = nn.Linear(config.d_model,config.d_model)
         self.Wk = nn.Linear(config.d_model,config.d_model)
         self.Wv = nn.Linear(config.d_model,config.d_model)
+        self.Ln1 = nn.LayerNorm(config.d_model)
+        self.ff = nn.Sequential(nn.Linear(config.d_model,config.d_model*4)
+                            ,nn.GELU()
+                            ,nn.Linear(config.d_model*4,config.d_model))
+        self.Ln2 = nn.LayerNorm(config.d_model)
     def forward(self , idx):
         B,T = idx.shape #B = batch size , T = block size 
         #get embedding for each token in each batch 
@@ -16,6 +21,12 @@ class TransformerModel(nn.Module):
         pos = torch.arange(T,device = idx.device)
         pos_emb = self.pos_embedding(pos)
         x = tok_emb + pos_emb
+        #attention noww 
+        x = x + self.attention(self.Ln1(x))
+        x = x + self.ff(self.Ln2(x)) 
+        return x 
+    def attention(self,x):
+        B,T,C = x.shape
         #attention noww 
         Q = self.Wq(x)
         K = self.Wk(x)
@@ -27,7 +38,7 @@ class TransformerModel(nn.Module):
         #scale by d_model **0.5 to have better dirstibution for gradients to update better 
         #if you dont scale then final softmax can look like [1,0,0,0] so bad gradient updates for the 0,0,0 because they dont know what went wrong 
 
-        mask = torch.tril(torch.ones(T,T,device = idx.device))
+        mask = torch.tril(torch.ones(T,T,device = x.device))
         #tril = lower triangle preserved 
         scores = scores.masked_fill(mask == 0 ,float('-inf'))
         #mask to -inf so current token cant peek to future 
@@ -35,4 +46,4 @@ class TransformerModel(nn.Module):
         scores = torch.softmax(scores , dim = -1)
         #dim = -1 so each row will add to 1 in softmax 
         out = scores @ V 
-        return out
+        return out 
