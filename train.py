@@ -14,9 +14,9 @@ criterion = nn.CrossEntropyLoss()
 
 #main training loop lezgoooo 
 losses = []
-steps = range(50000) 
+steps = range(1000) 
 print(tokenizer.vocab_size)
-for i in range(50000):
+for i in range(1000):
     x,y = Dataset.get_batch("train") 
     #do this or gradients will add up and accumulate  
     optimizer.zero_grad()
@@ -34,5 +34,5 @@ for i in range(50000):
     losses.append(loss.item()) 
     if i%100 == 0:
         print(f"current i = {i} : current loss = {loss.item()}")
-plt.plot(steps,losses)
-plt.show()
+start_text = torch.tensor([tokenizer.encode("william")],dtype= torch.long )
+model.generate(start_text,500,tokenizer)

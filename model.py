@@ -50,3 +50,16 @@ class TransformerModel(nn.Module):
         #dim = -1 so each row will add to 1 in softmax 
         out = scores @ V 
         return out 
+    @torch.no_grad()
+    def generate(self , idx ,max_generation , tokenizer):
+        for _ in range(max_generation):
+            temp_idx = idx[:,-config.block_size:]   
+            logits = self(temp_idx) 
+            logits = logits [:,-1,: ]
+            probs = torch.softmax(logits,dim=-1)
+            next_token = torch.multinomial(probs,num_samples=1) 
+            idx = torch.cat((idx,next_token) , dim=1) 
+        tokens = idx[0].tolist()
+        text = tokenizer.decode(tokens)
+        print(text)
+        return idx
