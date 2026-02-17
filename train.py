@@ -14,9 +14,9 @@ criterion = nn.CrossEntropyLoss()
 
 #main training loop lezgoooo 
 losses = []
-steps = range(1000) 
+steps = range(30000) 
 print(tokenizer.vocab_size)
-for i in range(1000):
+for i in range(30000):
     x,y = Dataset.get_batch("train") 
     #do this or gradients will add up and accumulate  
     optimizer.zero_grad()

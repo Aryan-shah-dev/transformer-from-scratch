@@ -4,6 +4,10 @@ import torch
 class TransformerModel(nn.Module):
     def __init__(self,vocab_size):
         super().__init__()
+        self.heads = config.num_heads 
+        self.dims = config.d_model//self.heads 
+        assert config.d_model% self.heads ==0 
+
         self.embedding = nn.Embedding(vocab_size,config.d_model) 
         self.pos_embedding = nn.Embedding(config.block_size, config.d_model) 
         self.Wq = nn.Linear(config.d_model,config.d_model)
@@ -16,6 +20,7 @@ class TransformerModel(nn.Module):
         self.Ln2 = nn.LayerNorm(config.d_model)
         self.Ln3 = nn.LayerNorm(config.d_model) 
         self.Lm_head = nn.Linear(config.d_model , vocab_size) 
+        self.proj = nn.Linear(config.d_model , config.d_model) 
     def forward(self , idx):
         B,T = idx.shape #B = batch size , T = block size 
         #get embedding for each token in each batch 
@@ -30,14 +35,21 @@ class TransformerModel(nn.Module):
         return logits 
     def attention(self,x):
         B,T,C = x.shape
+        h = self.heads 
+        d = self.dims 
         #attention noww 
         Q = self.Wq(x)
         K = self.Wk(x)
         V = self.Wv(x) 
+
         #now the main attention logic
-        scores = Q@ K.transpose(-2,-1) 
-        #no shape is (B,T,T) 
-        scores = scores/(config.d_model **0.5) 
+        #addede multi head pls no error 
+        Q = Q.view(B,T,h,d).transpose(1,2) #shape is now (B,h,T,d)
+        K = K.view(B,T,h,d).transpose(1,2)
+        V = V.view(B,T,h,d).transpose(1,2)
+
+        scores = Q@ K.transpose(-2,-1)  #shape is now (B,h,T,T)
+        scores = scores/(d **0.5) 
         #scale by d_model **0.5 to have better dirstibution for gradients to update better 
         #if you dont scale then final softmax can look like [1,0,0,0] so bad gradient updates for the 0,0,0 because they dont know what went wrong 
 
@@ -49,6 +61,8 @@ class TransformerModel(nn.Module):
         scores = torch.softmax(scores , dim = -1)
         #dim = -1 so each row will add to 1 in softmax 
         out = scores @ V 
+        out = out.transpose(1,2).contiguous().view(B,T,C)
+        out = self.proj(out) 
         return out 
     @torch.no_grad()
     def generate(self , idx ,max_generation , tokenizer):
