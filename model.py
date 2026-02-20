@@ -1,69 +1,27 @@
 import torch.nn as nn
 import config
 import torch
+from transformerblock import TransformerBlock
 class TransformerModel(nn.Module):
     def __init__(self,vocab_size):
         super().__init__()
-        self.heads = config.num_heads 
-        self.dims = config.d_model//self.heads 
-        assert config.d_model% self.heads ==0 
-
         self.embedding = nn.Embedding(vocab_size,config.d_model) 
         self.pos_embedding = nn.Embedding(config.block_size, config.d_model) 
-        self.Wq = nn.Linear(config.d_model,config.d_model)
-        self.Wk = nn.Linear(config.d_model,config.d_model)
-        self.Wv = nn.Linear(config.d_model,config.d_model)
-        self.Ln1 = nn.LayerNorm(config.d_model)
-        self.ff = nn.Sequential(nn.Linear(config.d_model,config.d_model*4)
-                            ,nn.GELU()
-                            ,nn.Linear(config.d_model*4,config.d_model))
-        self.Ln2 = nn.LayerNorm(config.d_model)
-        self.Ln3 = nn.LayerNorm(config.d_model) 
-        self.Lm_head = nn.Linear(config.d_model , vocab_size) 
-        self.proj = nn.Linear(config.d_model , config.d_model) 
+        self.ln_f = nn.LayerNorm(config.d_model) 
+        self.lm_head = nn.Linear(config.d_model , vocab_size) 
+        self.blocks = nn.ModuleList([TransformerBlock() for _ in range(config.num_block)])
     def forward(self , idx):
-        B,T = idx.shape #B = batch size , T = block size 
-        #get embedding for each token in each batch 
+        B,T = idx.shape 
         tok_emb = self.embedding(idx) 
         pos = torch.arange(T,device = idx.device)
         pos_emb = self.pos_embedding(pos)
         x = tok_emb + pos_emb
+        
         #attention noww 
-        x = x + self.attention(self.Ln1(x))
-        x = x + self.ff(self.Ln2(x)) 
-        logits = self.Lm_head(self.Ln3(x)) 
+        for block in self.blocks:
+            x = block(x) 
+        logits = self.lm_head(self.ln_f(x)) 
         return logits 
-    def attention(self,x):
-        B,T,C = x.shape
-        h = self.heads 
-        d = self.dims 
-        #attention noww 
-        Q = self.Wq(x)
-        K = self.Wk(x)
-        V = self.Wv(x) 
-
-        #now the main attention logic
-        #addede multi head pls no error 
-        Q = Q.view(B,T,h,d).transpose(1,2) #shape is now (B,h,T,d)
-        K = K.view(B,T,h,d).transpose(1,2)
-        V = V.view(B,T,h,d).transpose(1,2)
-
-        scores = Q@ K.transpose(-2,-1)  #shape is now (B,h,T,T)
-        scores = scores/(d **0.5) 
-        #scale by d_model **0.5 to have better dirstibution for gradients to update better 
-        #if you dont scale then final softmax can look like [1,0,0,0] so bad gradient updates for the 0,0,0 because they dont know what went wrong 
-
-        mask = torch.tril(torch.ones(T,T,device = x.device))
-        #tril = lower triangle preserved 
-        scores = scores.masked_fill(mask == 0 ,float('-inf'))
-        #mask to -inf so current token cant peek to future 
-        #i had the idea to just multiply matrices but e^0 is still 1 so theyll have probability 
-        scores = torch.softmax(scores , dim = -1)
-        #dim = -1 so each row will add to 1 in softmax 
-        out = scores @ V 
-        out = out.transpose(1,2).contiguous().view(B,T,C)
-        out = self.proj(out) 
-        return out 
     @torch.no_grad()
     def generate(self , idx ,max_generation , tokenizer):
         for _ in range(max_generation):
